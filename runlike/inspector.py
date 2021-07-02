@@ -16,9 +16,23 @@ def die(message):
 
 class Inspector(object):
 
-    def __init__(self, container=None, no_name=None, pretty=None):
+    def __init__(self, container=None, no_name=None, no_command=None, no_network=None, no_detach=None, no_restart=None, force_interactive=None, force_exec=None, pretty=None):
         self.container = container
         self.no_name = no_name
+        self.no_command = no_command
+        self.no_network = no_network
+        self.no_detach = no_detach
+        self.no_restart = no_restart
+        self.force_interactive = force_interactive
+        self.force_exec = force_exec
+        if force_exec:
+            self.no_name = True
+            self.no_command = True
+            self.no_network = True
+            self.no_detach = True
+            self.no_restart = True
+            self.force_interactive = True
+
         self.output = ""
         self.pretty = pretty
         self.facts = None
@@ -195,16 +209,21 @@ class Inspector(object):
         self.multi_option("HostConfig.CapDrop", "cap-drop")
         self.multi_option("HostConfig.Dns", "dns")
         network_mode = self.get_fact("HostConfig.NetworkMode")
-        if network_mode != "default":
+        if not self.no_network and network_mode != "default":
             self.options.append("--network=" + network_mode)
         privileged = self.get_fact('HostConfig.Privileged')
         if privileged:
             self.options.append("--privileged")
 
+        if self.force_interactive:
+            self.options.append("-it")
+
         self.parse_workdir()
-        self.parse_ports()
+        if not self.no_network:
+            self.parse_ports()
         self.parse_links()
-        self.parse_restart()
+        if not self.no_restart:
+            self.parse_restart()
         self.parse_devices()
         self.parse_labels()
         self.parse_log()
@@ -212,7 +231,7 @@ class Inspector(object):
         self.parse_runtime()
 
         stdout_attached = self.get_fact("Config.AttachStdout")
-        if not stdout_attached:
+        if not self.no_detach and not stdout_attached:
             self.options.append("--detach=true")
 
         if self.get_fact("Config.Tty"):
@@ -224,7 +243,7 @@ class Inspector(object):
         parameters.append(image)
 
         cmd_parts = self.get_fact("Config.Cmd")
-        if cmd_parts:
+        if not self.no_command and cmd_parts:
             # NOTE: pipes.quote() performs syntactically correct
             # quoting and replace operation below is needed just for
             # aesthetic reasons and visual similarity with old output.
@@ -234,6 +253,9 @@ class Inspector(object):
             ]
             command = " ".join(quoted)
             parameters.append(command)
+
+        if self.force_exec:
+            parameters.append("bash")
 
         joiner = " "
         if self.pretty:
