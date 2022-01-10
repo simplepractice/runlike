@@ -199,7 +199,8 @@ class Inspector(object):
             self.options.append("--name=%s" % name)
         self.parse_hostname()
         self.parse_user()
-        self.parse_macaddress()
+        if not self.no_network:
+            self.parse_macaddress()
 
         self.multi_option("Config.Env", "env")
         self.multi_option("HostConfig.Binds", "volume")
